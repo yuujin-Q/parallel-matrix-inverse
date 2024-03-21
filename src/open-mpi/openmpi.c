@@ -4,7 +4,19 @@
 
 #define ROOT_PROCESS 0
 
-void read_matrix(double **matrix, int *n, int rank) {
+void print_result(double **mat, int n, int rank) {
+    if (rank != 0) {
+        return;
+    }
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%lf ", mat[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+void read_matrix(double ***matrix, int *n, int rank) {
     /**
      * reads matrix from user input
     */
@@ -16,23 +28,26 @@ void read_matrix(double **matrix, int *n, int rank) {
     MPI_Bcast(n, 1, MPI_INT, ROOT_PROCESS, MPI_COMM_WORLD);
 
     // allocate augmented matrix
-    matrix = (double **) malloc((2 * (*n)) * sizeof(double *));
-    if (matrix == NULL) {
+    *matrix = (double **) malloc((2 * (*n)) * sizeof(double *));
+    if (*matrix == NULL) {
         fprintf(stderr, "Matrix row allocation failed\n");
         return;
     }
+    // aman smpe sini bos
 
-    for (int i = 0; i < *n; i++) {
-        matrix[i] = (double *) malloc(2 * (*n) * sizeof(double));
-        if (matrix[i] == NULL) {
+    ////////
+    for (int i = 0; i < 2*(*n); i++) {
+        (*matrix)[i] = (double *) malloc(2 * (*n) * sizeof(double));
+        if ((*matrix)[i] == NULL) {
             fprintf(stderr, "Matrix columns allocation failed\n");
             for (int j = 0; j < i; j++) {
-                free(matrix[j]);
+                free((*matrix)[j]);
             }
-            free(matrix);
+            free(*matrix);
             return;
         }
     }
+    print_result(*matrix, 2*(*n), rank);
 
     // read I/O if is root process
     if (rank == 0) {
@@ -41,23 +56,29 @@ void read_matrix(double **matrix, int *n, int rank) {
         for (int i = 0; i < *n; i++) {
             for (int j = 0; j < *n; j++) {
                 scanf("%lf", &d);
-                matrix[i][j] = d;
+                (*matrix)[i][j] = d;
             }
         }
         // identity matrix
         for(int i = 0; i < *n; ++i)
         {
-            for(int j = 0; j < 2*(*n); ++j)
+            for(int j = *n; j < 2*(*n); ++j)
             {
-                if(j == (i+(*n)))
+                if (j == (i+(*n)))
                 {
-                    matrix[i][j] = 1;
-                }else{
-                    matrix[i][j] = 0;
+                    (*matrix)[i][j] = 1;
+                } else{
+                    (*matrix)[i][j] = 0;
                 }
             }
         }
-    }    
+    }   
+
+    // for (int i = 0; i < *n; i++) {
+    //     free((*matrix)[i]);
+    // }
+    // free(*matrix); 
+
 }
 
 int parse_matrix(double **matrix, int rank, char *filename) {
@@ -109,17 +130,7 @@ int parse_matrix(double **matrix, int rank, char *filename) {
     // }
 }
 
-void print_result(double **mat, int n, int rank) {
-    if (rank != 0) {
-        return;
-    }
-    for (int i = n; i < 2*n; i++) {
-        for (int j = 0; j < n; j++) {
-            printf("%lf ", mat[i][j]);
-        }
-        printf("\n");
-    }
-}
+
 
 void invert_matrix(double **mat, int n, int my_rank, int comm_sz) {
     int block_size = n / (comm_sz);
@@ -216,7 +227,7 @@ void invert_matrix(double **mat, int n, int my_rank, int comm_sz) {
      * 
      * combine results of matrix inverse
     */
-    double **gathered_mat;
+    double **gathered_mat=NULL;
 
     if (my_rank == 0) {
         gathered_mat = (double **) malloc(n * sizeof(double *));
@@ -252,7 +263,7 @@ void invert_matrix(double **mat, int n, int my_rank, int comm_sz) {
 int main(int argc, char* argv[]) {
     int i = 0, j = 0, k = 0, n = 0;
     int my_rank, comm_sz;
-    double **mat;
+    double **mat=NULL;
     double d = 0.0;
     
     MPI_Init(NULL, NULL);
@@ -265,7 +276,8 @@ int main(int argc, char* argv[]) {
      * 
      * readMatrix only reads if my_rank is root
     */
-    read_matrix(mat, &n, my_rank);
+    read_matrix(&mat, &n, my_rank);
+    print_result(mat, n, my_rank);
     
     // TODO: read argc and argv for textfile for input matrix?
 
