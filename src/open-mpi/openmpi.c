@@ -40,7 +40,7 @@ int allocate_matrix(double ***matrix, int *n, int rank)
     if (*matrix == NULL)
     {
         fprintf(stderr, "Matrix row allocation failed\n");
-        return;
+        return 1;
     }
     for (int i = 0; i < 2 * (*n); i++)
     {
@@ -53,10 +53,11 @@ int allocate_matrix(double ***matrix, int *n, int rank)
                 free((*matrix)[j]);
             }
             free(*matrix);
-            return;
+            return 1;
         }
     }
     print_result(*matrix, 2 * (*n), rank);
+    return 0;
 }
 
 void read_matrix(double ***matrix, int *n, int rank)
@@ -310,7 +311,8 @@ int main(int argc, char *argv[])
      *
      * readMatrix only reads if my_rank is root
      */
-    allocate_matrix(&mat, &n, my_rank);
+    if (allocate_matrix(&mat, &n, my_rank) == 1)
+        return 1;
     read_matrix(&mat, &n, my_rank);
     print_result(mat, n, my_rank);
 
