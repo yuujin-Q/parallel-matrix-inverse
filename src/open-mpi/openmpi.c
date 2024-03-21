@@ -1,29 +1,36 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <mpi.h>
 
 #define ROOT_PROCESS 0
 
-void print_result(double **mat, int n, int rank)
+void print_result(double *mat, int n, int m, int rank)
 {
+    /**
+     * n = rows, m = cols
+     */
     if (rank != 0)
     {
         return;
     }
+
     for (int i = 0; i < n; i++)
     {
-        for (int j = 0; j < n; j++)
+        for (int j = 0; j < m; j++)
         {
-            printf("%lf ", mat[i][j]);
+            printf("%lf ", mat[m * i + j]);
         }
         printf("\n");
     }
 }
 
-int allocate_matrix(double ***matrix, int *n, int rank)
+int allocate_matrix(double **matrix, int *n, int rank, bool isAugmented)
 {
     /**
      * allocates matrix
+     * -1 rank for allocate only (n known)
+     * 0+ rank for MPI processes
      */
 
     // read I/O for array size if is root process
@@ -31,36 +38,34 @@ int allocate_matrix(double ***matrix, int *n, int rank)
     {
         scanf("%d", n);
     }
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Bcast(n, 1, MPI_INT, ROOT_PROCESS, MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (rank != -1)
+    {
+        MPI_Bcast(n, 1, MPI_INT, ROOT_PROCESS, MPI_COMM_WORLD);
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
 
-    // allocate augmented matrix
-    *matrix = (double **)malloc((2 * (*n)) * sizeof(double *));
+    // allocate
+    if (isAugmented)
+    {
+        *matrix = (double *)malloc((*n) * (2 * (*n)) * sizeof(double));
+    }
+    else
+    {
+        *matrix = (double *)malloc((*n) * (*n) * sizeof(double));
+    }
     if (*matrix == NULL)
     {
-        fprintf(stderr, "Matrix row allocation failed\n");
+        fprintf(stderr, "Flat matrix allocation failed\n");
         return 1;
     }
-    for (int i = 0; i < 2 * (*n); i++)
+    if (rank == 0)
     {
-        (*matrix)[i] = (double *)malloc(2 * (*n) * sizeof(double));
-        if ((*matrix)[i] == NULL)
-        {
-            fprintf(stderr, "Matrix columns allocation failed\n");
-            for (int j = 0; j < i; j++)
-            {
-                free((*matrix)[j]);
-            }
-            free(*matrix);
-            return 1;
-        }
+        print_result(*matrix, (*n), 2 * (*n), rank);
     }
-    print_result(*matrix, 2 * (*n), rank);
     return 0;
 }
 
-void read_matrix(double ***matrix, int *n, int rank)
+void read_matrix(double **matrix, int *n, int rank)
 {
     /**
      * reads matrix from user input
@@ -76,7 +81,7 @@ void read_matrix(double ***matrix, int *n, int rank)
             for (int j = 0; j < *n; j++)
             {
                 scanf("%lf", &d);
-                (*matrix)[i][j] = d;
+                (*matrix)[(2 * (*n)) * i + j] = d;
             }
         }
         // augmented identity matrix
@@ -86,11 +91,11 @@ void read_matrix(double ***matrix, int *n, int rank)
             {
                 if (j == (i + (*n)))
                 {
-                    (*matrix)[i][j] = 1;
+                    (*matrix)[(2 * (*n)) * i + j] = 1;
                 }
                 else
                 {
-                    (*matrix)[i][j] = 0;
+                    (*matrix)[(2 * (*n)) * i + j] = 0;
                 }
             }
         }
@@ -147,7 +152,7 @@ int parse_matrix(double **matrix, int rank, char *filename)
     // }
 }
 
-void invert_matrix(double **mat, int n, int my_rank, int comm_sz)
+int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **inverse)
 {
     int block_size = n / (comm_sz);
     int local_start_row = my_rank * block_size;
@@ -170,7 +175,7 @@ void invert_matrix(double **mat, int n, int my_rank, int comm_sz)
             // populate pivot row with row i
             for (int l = 0; l < 2 * n; l++)
             {
-                pivot_row[l] = mat[i][l];
+                pivot_row[l] = (*mat)[(2 * (n)) * i + l];
             }
         }
 
@@ -189,11 +194,11 @@ void invert_matrix(double **mat, int n, int my_rank, int comm_sz)
             // Subtract row that is not pivot
             if (j != i)
             {
-                double d = mat[j][i] / pivot_row[i]; // assign d to ratio of mat[j][i]/ pivot[i][i]
+                double d = (*mat)[(2 * (n)) * j + i] / pivot_row[i];
 
                 for (int k = 0; k < 2 * n; k++)
                 {
-                    mat[j][k] -= d * mat[i][k];
+                    (*mat)[(2 * (n)) * j + k] -= d * (*mat)[(2 * (n)) * i + k];
                     // subtract my assigned row with d * pivot row
                 }
             }
@@ -208,45 +213,27 @@ void invert_matrix(double **mat, int n, int my_rank, int comm_sz)
     for (int i = local_start_row; i < local_end_row; i++)
     {
         // Assign d with diagonal
-        int d = mat[i][i];
+        double d = (*mat)[(2 * (n)) * i + i];
 
         for (int j = 0; j < 2 * n; j++)
         {
             // Divide each element in local rows
-            mat[i][j] /= d;
+            (*mat)[(2 * (n)) * i + j] /= d;
         }
     }
 
     // allocate result matrix
-    double **result_mat;
-
-    result_mat = (double **)malloc((local_end_row - local_start_row) * sizeof(double *));
-    if (result_mat == NULL)
+    double *local_result;
+    if (allocate_matrix(&local_result, &n, -1, false) == 1)
     {
-        fprintf(stderr, "result_mat row allocation failed\n");
-        return;
+        free(pivot_row);
+        return 1;
     }
-
-    for (int i = 0; i < local_end_row - local_start_row; i++)
-    {
-        result_mat[i] = (double *)malloc(n * sizeof(double));
-        if (result_mat[i] == NULL)
-        {
-            fprintf(stderr, "result_mat columns allocation failed\n");
-            for (int j = 0; j < i; j++)
-            {
-                free(result_mat[j]);
-            }
-            free(result_mat);
-            return;
-        }
-    }
-
     for (int i = 0; i < (local_end_row - local_start_row); i++)
     {
         for (int j = n; j < 2 * n; j++)
         {
-            result_mat[i][j - n] = mat[local_start_row + i][j];
+            local_result[n * i + (j - n)] = (*mat)[(2 * (n)) * (local_start_row + i) + j];
         }
     }
 
@@ -255,30 +242,14 @@ void invert_matrix(double **mat, int n, int my_rank, int comm_sz)
      *
      * combine results of matrix inverse
      */
-    double **gathered_mat = NULL;
 
     if (my_rank == 0)
     {
-        gathered_mat = (double **)malloc(n * sizeof(double *));
-        if (gathered_mat == NULL)
+        if (allocate_matrix(inverse, &n, -1, false) == 1)
         {
-            fprintf(stderr, "gathered_mat row allocation failed\n");
-            return;
-        }
-
-        for (int i = 0; i < local_end_row - local_start_row; i++)
-        {
-            gathered_mat[i] = (double *)malloc(n * sizeof(double));
-            if (gathered_mat[i] == NULL)
-            {
-                fprintf(stderr, "gathered_mat columns allocation failed\n");
-                for (int j = 0; j < i; j++)
-                {
-                    free(gathered_mat[j]);
-                }
-                free(gathered_mat);
-                return;
-            }
+            free(pivot_row);
+            free(local_result);
+            return 1;
         }
     }
 
@@ -286,19 +257,18 @@ void invert_matrix(double **mat, int n, int my_rank, int comm_sz)
      * Reduce to diagonal matrix
      * receives and broadcasts current pivot row
      */
-    MPI_Gather(result_mat, (local_end_row - local_start_row) * 2 * n, MPI_DOUBLE, gathered_mat, n * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Gather(local_result, (local_end_row - local_start_row) * n, MPI_DOUBLE, *inverse, n * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    if (my_rank == 0)
-    {
-        print_result(gathered_mat, n, my_rank);
-    }
+    return 0;
 }
 
 int main(int argc, char *argv[])
 {
     int i = 0, j = 0, k = 0, n = 0;
     int my_rank, comm_sz;
-    double **mat = NULL;
+    double *mat = NULL;
+    double *inverse = NULL;
     double d = 0.0;
 
     MPI_Init(NULL, NULL);
@@ -311,10 +281,10 @@ int main(int argc, char *argv[])
      *
      * readMatrix only reads if my_rank is root
      */
-    if (allocate_matrix(&mat, &n, my_rank) == 1)
+    if (allocate_matrix(&mat, &n, my_rank, true) == 1)
         return 1;
     read_matrix(&mat, &n, my_rank);
-    print_result(mat, n, my_rank);
+    print_result(mat, n, n, my_rank);
 
     // TODO: read argc and argv for textfile for input matrix?
 
@@ -325,9 +295,20 @@ int main(int argc, char *argv[])
     MPI_Barrier(MPI_COMM_WORLD);
 
     // time calculate
-    invert_matrix(mat, n, my_rank, comm_sz);
+    if (invert_matrix(&mat, n, my_rank, comm_sz, &inverse) == 1)
+    {
+        if (mat != NULL)
+            free(mat);
+        if (inverse != NULL)
+            free(inverse);
+        MPI_Finalize();
+        return 1;
+    }
 
-    print_result(mat, n, my_rank);
+    print_result(inverse, n, n, my_rank);
+
+    free(mat);
+    free(inverse);
     MPI_Finalize();
 
     return 0;
