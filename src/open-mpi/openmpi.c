@@ -25,7 +25,9 @@ void read_matrix(double ***matrix, int *n, int rank) {
     if (rank == 0) {
         scanf("%d", n);
     }
+    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Bcast(n, 1, MPI_INT, ROOT_PROCESS, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     // allocate augmented matrix
     *matrix = (double **) malloc((2 * (*n)) * sizeof(double *));
@@ -156,7 +158,9 @@ void invert_matrix(double **mat, int n, int my_rank, int comm_sz) {
         }
 
         // send/receive broadcast of pivot row
+        MPI_Barrier(MPI_COMM_WORLD);
         MPI_Bcast(pivot_row, 2*n, MPI_DOUBLE, bcast_sender_rank, MPI_COMM_WORLD);
+        MPI_Barrier(MPI_COMM_WORLD);
         
         /**
          * Subtraction of rows by pivot received from bcast
@@ -282,11 +286,11 @@ int main(int argc, char* argv[]) {
     // TODO: read argc and argv for textfile for input matrix?
 
     // broadcast initial matrix data
+    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Bcast(&n, 1, MPI_INT, ROOT_PROCESS, MPI_COMM_WORLD);
     MPI_Bcast(mat, n * 2*n, MPI_DOUBLE, ROOT_PROCESS, MPI_COMM_WORLD);
-    
     MPI_Barrier(MPI_COMM_WORLD);
-
+    
     // time calculate
     invert_matrix(mat, n, my_rank, comm_sz);
 
