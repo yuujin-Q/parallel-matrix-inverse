@@ -191,7 +191,7 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
         }
     }
 
-    // allocate result matrix
+    // allocate local_result matrix (fragment of final solution)
     double *local_result = (double *)malloc((local_end_row - local_start_row) * n * sizeof(double));
     if (local_result == NULL)
     {
@@ -207,11 +207,10 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
     }
 
     /**
-     * ROOT PROCESS
+     * RECOMBINE SOLUTION
      *
-     * combine results of matrix inverse
+     * combine results of matrix inverse from local_results of each process to buffer `inverse`
      */
-
     if (my_rank == 0)
     {
         if (allocate_matrix(inverse, &n, -1, false) == 1)
@@ -221,15 +220,7 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
             return 1;
         }
     }
-
-    /**
-     * Reduce to diagonal matrix
-     * receives and broadcasts current pivot row
-     */
     MPI_Barrier(MPI_COMM_WORLD);
-    // int MPI_Gatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
-    //                 void *recvbuf, const int recvcounts[], const int displs[], MPI_Datatype recvtype,
-    //                 int root, MPI_Comm comm)
     MPI_Gatherv(local_result, (local_end_row - local_start_row) * n, MPI_DOUBLE,
                 *inverse, recvcounts, offsets, MPI_DOUBLE,
                 0, MPI_COMM_WORLD);
@@ -265,7 +256,6 @@ int main(int argc, char *argv[])
     MPI_Bcast(mat, n * 2 * n, MPI_DOUBLE, ROOT_PROCESS, MPI_COMM_WORLD);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // todo: time calculate
     invert_matrix(&mat, n, my_rank, comm_sz, &inverse);
 
     print_result(inverse, n, n, my_rank);
