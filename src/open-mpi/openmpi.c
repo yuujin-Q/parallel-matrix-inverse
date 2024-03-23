@@ -20,6 +20,7 @@ void print_result(double *mat, int n, int m, int rank)
         return;
     }
 
+    printf("%d\n", n);
     for (int i = 0; i < n; i++)
     {
         for (int j = 0; j < m; j++)
@@ -171,7 +172,7 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
                 }
                 for (int k = 0; k < 2 * n; k++)
                 {
-                    (*mat)[get_matrix_index(j, k, 2 * n)] -= d * (*mat)[get_matrix_index(i, k, 2 * n)];
+                    (*mat)[get_matrix_index(j, k, 2 * n)] -= d * pivot_row[k];
                     // subtract my assigned row with d * pivot row
                 }
             }
@@ -234,7 +235,7 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
 
 int main(int argc, char *argv[])
 {
-    int i = 0, j = 0, k = 0, n = 0;
+    int n = 0;
     int my_rank, comm_sz;
     double *mat = NULL;
     double *inverse = NULL;
