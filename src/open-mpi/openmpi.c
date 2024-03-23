@@ -63,10 +63,7 @@ int allocate_matrix(double **matrix, int *n, int rank, bool isAugmented)
         fprintf(stderr, "Flat matrix allocation failed\n");
         return 1;
     }
-    if (rank == 0)
-    {
-        print_result(*matrix, (*n), 2 * (*n), rank);
-    }
+
     return 0;
 }
 
@@ -109,11 +106,28 @@ void read_matrix(double **matrix, int *n, int rank)
 
 int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **inverse)
 {
+    // calculate row start and ends for local processing
     int block_size = n / (comm_sz);
     int local_start_row = my_rank * block_size;
     int local_end_row = (my_rank == comm_sz - 1) ? n : (my_rank + 1) * block_size;
     double *pivot_row;
 
+    // calculate recvcount and displs for gatherv
+    int recvcounts[comm_sz];
+    int offsets[comm_sz];
+    if (my_rank == 0)
+    {
+        for (int i = 0; i < comm_sz; i++)
+        {
+            int process_start_row = i * (n / comm_sz);
+            int process_end_row = (i == comm_sz - 1) ? n : (i + 1) * (n / comm_sz);
+
+            recvcounts[i] = (process_end_row - process_start_row) * n;
+            offsets[i] = process_start_row * n;
+        }
+    }
+
+    // local pivot to be sent
     pivot_row = (double *)malloc(2 * n * sizeof(double));
 
     /**
@@ -213,7 +227,12 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
      * receives and broadcasts current pivot row
      */
     MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Gather(local_result, (local_end_row - local_start_row) * n, MPI_DOUBLE, *inverse, n * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    // int MPI_Gatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+    //                 void *recvbuf, const int recvcounts[], const int displs[], MPI_Datatype recvtype,
+    //                 int root, MPI_Comm comm)
+    MPI_Gatherv(local_result, (local_end_row - local_start_row) * n, MPI_DOUBLE,
+                *inverse, recvcounts, offsets, MPI_DOUBLE,
+                0, MPI_COMM_WORLD);
 
     return 0;
 }
