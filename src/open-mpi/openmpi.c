@@ -239,9 +239,6 @@ int main(int argc, char *argv[])
     if (allocate_matrix(&mat, &n, my_rank, true) == 1)
         return 1;
     read_matrix(&mat, &n, my_rank);
-    print_result(mat, n, n, my_rank);
-
-    // TODO: read argc and argv for textfile for input matrix?
 
     // broadcast initial matrix data
     MPI_Barrier(MPI_COMM_WORLD);
@@ -249,7 +246,7 @@ int main(int argc, char *argv[])
     MPI_Bcast(mat, n * 2 * n, MPI_DOUBLE, ROOT_PROCESS, MPI_COMM_WORLD);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // time calculate
+    // todo: time calculate
     invert_matrix(&mat, n, my_rank, comm_sz, &inverse);
 
     print_result(inverse, n, n, my_rank);
