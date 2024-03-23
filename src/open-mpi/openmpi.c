@@ -5,6 +5,11 @@
 
 #define ROOT_PROCESS 0
 
+int get_matrix_index(int row, int col, int width)
+{
+    return width * row + col;
+}
+
 void print_result(double *mat, int n, int m, int rank)
 {
     /**
@@ -19,7 +24,7 @@ void print_result(double *mat, int n, int m, int rank)
     {
         for (int j = 0; j < m; j++)
         {
-            printf("%lf ", mat[m * i + j]);
+            printf("%lf ", mat[get_matrix_index(i, j, m)]);
         }
         printf("\n");
     }
@@ -81,7 +86,7 @@ void read_matrix(double **matrix, int *n, int rank)
             for (int j = 0; j < *n; j++)
             {
                 scanf("%lf", &d);
-                (*matrix)[(2 * (*n)) * i + j] = d;
+                (*matrix)[get_matrix_index(i, j, 2 * (*n))] = d;
             }
         }
         // augmented identity matrix
@@ -91,11 +96,11 @@ void read_matrix(double **matrix, int *n, int rank)
             {
                 if (j == (i + (*n)))
                 {
-                    (*matrix)[(2 * (*n)) * i + j] = 1;
+                    (*matrix)[get_matrix_index(i, j, 2 * (*n))] = 1;
                 }
                 else
                 {
-                    (*matrix)[(2 * (*n)) * i + j] = 0;
+                    (*matrix)[get_matrix_index(i, j, 2 * (*n))] = 0;
                 }
             }
         }
@@ -175,7 +180,7 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
             // populate pivot row with row i
             for (int l = 0; l < 2 * n; l++)
             {
-                pivot_row[l] = (*mat)[(2 * (n)) * i + l];
+                pivot_row[l] = (*mat)[get_matrix_index(i, l, 2 * n)];
             }
         }
 
@@ -194,11 +199,11 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
             // Subtract row that is not pivot
             if (j != i)
             {
-                double d = (*mat)[(2 * (n)) * j + i] / pivot_row[i];
+                double d = (*mat)[get_matrix_index(j, i, 2 * n)] / pivot_row[i];
 
                 for (int k = 0; k < 2 * n; k++)
                 {
-                    (*mat)[(2 * (n)) * j + k] -= d * (*mat)[(2 * (n)) * i + k];
+                    (*mat)[get_matrix_index(j, k, 2 * n)] -= d * (*mat)[get_matrix_index(i, k, 2 * n)];
                     // subtract my assigned row with d * pivot row
                 }
             }
@@ -213,18 +218,18 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
     for (int i = local_start_row; i < local_end_row; i++)
     {
         // Assign d with diagonal
-        double d = (*mat)[(2 * (n)) * i + i];
+        double d = (*mat)[get_matrix_index(i, i, 2 * n)];
 
         for (int j = 0; j < 2 * n; j++)
         {
             // Divide each element in local rows
-            (*mat)[(2 * (n)) * i + j] /= d;
+            (*mat)[get_matrix_index(i, j, 2 * n)] /= d;
         }
     }
 
     // allocate result matrix
-    double *local_result;
-    if (allocate_matrix(&local_result, &n, -1, false) == 1)
+    double *local_result = (double *)malloc((local_end_row - local_start_row) * n * sizeof(double));
+    if (local_result == NULL)
     {
         free(pivot_row);
         return 1;
@@ -233,7 +238,7 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
     {
         for (int j = n; j < 2 * n; j++)
         {
-            local_result[n * i + (j - n)] = (*mat)[(2 * (n)) * (local_start_row + i) + j];
+            local_result[get_matrix_index(i, j - n, n)] = (*mat)[get_matrix_index(local_start_row + i, j, 2 * n)];
         }
     }
 
@@ -295,21 +300,14 @@ int main(int argc, char *argv[])
     MPI_Barrier(MPI_COMM_WORLD);
 
     // time calculate
-    if (invert_matrix(&mat, n, my_rank, comm_sz, &inverse) == 1)
-    {
-        if (mat != NULL)
-            free(mat);
-        if (inverse != NULL)
-            free(inverse);
-        MPI_Finalize();
-        return 1;
-    }
+    invert_matrix(&mat, n, my_rank, comm_sz, &inverse);
 
     print_result(inverse, n, n, my_rank);
 
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Finalize();
     free(mat);
     free(inverse);
-    MPI_Finalize();
 
     return 0;
 }
