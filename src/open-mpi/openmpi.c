@@ -137,7 +137,7 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
      */
     for (int i = 0; i < n; i++)
     {
-        int bcast_sender_rank = (i / comm_sz < comm_sz - 1) ? i / comm_sz : comm_sz - 1;
+        int bcast_sender_rank = (i / block_size < comm_sz) ? i / block_size : comm_sz - 1;
 
         if (bcast_sender_rank == my_rank)
         {
@@ -158,13 +158,17 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
          *
          * only subtract rows owned by process, between local_start_row and local_end_row
          */
-        for (int j = local_start_row; j < local_end_row && j >= i; j++)
+        for (int j = local_start_row; j < local_end_row; j++)
         {
             // Subtract row that is not pivot
             if (j != i)
             {
                 double d = (*mat)[get_matrix_index(j, i, 2 * n)] / pivot_row[i];
 
+                if (d == 0)
+                {
+                    continue;
+                }
                 for (int k = 0; k < 2 * n; k++)
                 {
                     (*mat)[get_matrix_index(j, k, 2 * n)] -= d * (*mat)[get_matrix_index(i, k, 2 * n)];
