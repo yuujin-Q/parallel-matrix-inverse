@@ -158,7 +158,7 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
          *
          * only subtract rows owned by process, between local_start_row and local_end_row
          */
-        for (int j = local_start_row; j < local_end_row; j++)
+        for (int j = local_start_row; j < local_end_row && j >= i; j++)
         {
             // Subtract row that is not pivot
             if (j != i)
