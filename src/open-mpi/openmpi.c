@@ -107,56 +107,6 @@ void read_matrix(double **matrix, int *n, int rank)
     }
 }
 
-int parse_matrix(double **matrix, int rank, char *filename)
-{
-    // // TODO: read matrix from file
-    // if (rank != 0) {
-    //     return;
-    // }
-    // FILE *file;
-    // int n,rows,cols;
-    // int i, j;
-    // file = fopen(*filename, "r");
-    // if (file == NULL) {
-    //     printf("Error opening the file.\n");
-    //     return 1;
-    // }
-    //  // Read the number of elements from the first line
-    // fscanf(file, "%d", &n);
-
-    // matrix = (double **) malloc((2*n) * sizeof(double *));
-    // if (matrix == NULL) {
-    //     fprintf(stderr, "Matrix row allocation failed\n");
-    //     return;
-    // }
-
-    // // Read the matrix elements
-    // rows = 0;
-    // while (fscanf(file, "%d", &matrix[rows][0]) == 1) {
-    //     for (j = 1; j < n; j++) {
-    //         fscanf(file, "%d", &matrix[rows][j]);
-    //     }
-    //     rows++;
-    // }
-
-    // // Close the file
-    // fclose(file);
-
-    // //identity matrix
-    // for(i = 0; i < n; ++i)
-    // {
-    //     for(j = 0; j < 2*n; ++j)
-    //     {
-    //         if(j == (i+n))
-    //         {
-    //             matrix[i][j] = 1;
-    //         }else{
-    //             matrix[i][j] = 0;
-    //         }
-    //     }
-    // }
-}
-
 int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **inverse)
 {
     int block_size = n / (comm_sz);
