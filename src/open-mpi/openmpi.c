@@ -237,10 +237,9 @@ int main(int argc, char *argv[])
 {
     int n = 0;
     int my_rank, comm_sz;
-    double start, finish;
+    // double start, finish;
     double *mat = NULL;
     double *inverse = NULL;
-    double d = 0.0;
 
     MPI_Init(NULL, NULL);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
@@ -262,16 +261,16 @@ int main(int argc, char *argv[])
     MPI_Bcast(mat, n * 2 * n, MPI_DOUBLE, ROOT_PROCESS, MPI_COMM_WORLD);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    start = MPI_Wtime();
+    // start = MPI_Wtime();
     invert_matrix(&mat, n, my_rank, comm_sz, &inverse);
-    finish = MPI_Wtime();
+    // finish = MPI_Wtime();
     
     print_result(inverse, n, n, my_rank);
 
-    if (my_rank == 0)
-    {
-        printf("Execution Time: %lf\n", finish - start);
-    }
+    // if (my_rank == 0)
+    // {
+    //     printf("Execution Time: %lf\n", finish - start);
+    // }
 
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
