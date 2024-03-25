@@ -113,9 +113,12 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
     int local_end_row = (my_rank == comm_sz - 1) ? n : (my_rank + 1) * block_size;
     double *pivot_row;
 
-    // calculate recvcount and displs for gatherv
+    // calculate recvcount and displs for gatherv & scatterv
     int recvcounts[comm_sz];
     int offsets[comm_sz];
+
+    int sendcounts[comm_sz];
+    int send_offset[comm_sz];
     if (my_rank == 0)
     {
         for (int i = 0; i < comm_sz; i++)
@@ -124,9 +127,18 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
             int process_end_row = (i == comm_sz - 1) ? n : (i + 1) * (n / comm_sz);
 
             recvcounts[i] = (process_end_row - process_start_row) * n;
+            sendcounts[i] = (process_end_row - process_start_row) * 2 * n;
+
             offsets[i] = process_start_row * n;
+            send_offset[i] = process_start_row * 2 * n;
         }
     }
+
+
+    // scatterv for mat
+    double *local_matrix = (double *)malloc((local_end_row - local_start_row) * 2 * n * sizeof(double));
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Scatterv(*mat, sendcounts, send_offset, MPI_DOUBLE, local_matrix, (local_end_row - local_start_row) * 2 * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     // local pivot to be sent
     pivot_row = (double *)malloc(2 * n * sizeof(double));
@@ -145,26 +157,25 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
             // populate pivot row with row i
             for (int l = 0; l < 2 * n; l++)
             {
-                pivot_row[l] = (*mat)[get_matrix_index(i, l, 2 * n)];
+                pivot_row[l] = local_matrix[get_matrix_index(i - local_start_row, l, 2 * n)];
             }
         }
 
         // send/receive broadcast of pivot row
         MPI_Barrier(MPI_COMM_WORLD);
         MPI_Bcast(pivot_row, 2 * n, MPI_DOUBLE, bcast_sender_rank, MPI_COMM_WORLD);
-        MPI_Barrier(MPI_COMM_WORLD);
 
         /**
          * Subtraction of rows by pivot received from bcast
          *
          * only subtract rows owned by process, between local_start_row and local_end_row
          */
-        for (int j = local_start_row; j < local_end_row; j++)
+        for (int j = 0; j < (local_end_row - local_start_row); j++)
         {
             // Subtract row that is not pivot
-            if (j != i)
+            if (j != i - local_start_row)
             {
-                double d = (*mat)[get_matrix_index(j, i, 2 * n)] / pivot_row[i];
+                double d = local_matrix[get_matrix_index(j, i, 2 * n)] / pivot_row[i];
 
                 if (d == 0)
                 {
@@ -172,7 +183,7 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
                 }
                 for (int k = 0; k < 2 * n; k++)
                 {
-                    (*mat)[get_matrix_index(j, k, 2 * n)] -= d * pivot_row[k];
+                    local_matrix[get_matrix_index(j, k, 2 * n)] -= d * pivot_row[k];
                     // subtract my assigned row with d * pivot row
                 }
             }
@@ -184,15 +195,15 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
      *
      * Divide each local row with pivot diagonal value to produce local trapezoid of solution
      */
-    for (int i = local_start_row; i < local_end_row; i++)
+    for (int i = 0; i < (local_end_row - local_start_row); i++)
     {
         // Assign d with diagonal
-        double d = (*mat)[get_matrix_index(i, i, 2 * n)];
+        double d = local_matrix[get_matrix_index(i, i + local_start_row, 2 * n)];
 
         for (int j = 0; j < 2 * n; j++)
         {
             // Divide each element in local rows
-            (*mat)[get_matrix_index(i, j, 2 * n)] /= d;
+            local_matrix[get_matrix_index(i, j, 2 * n)] /= d;
         }
     }
 
@@ -207,7 +218,7 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
     {
         for (int j = n; j < 2 * n; j++)
         {
-            local_result[get_matrix_index(i, j - n, n)] = (*mat)[get_matrix_index(local_start_row + i, j, 2 * n)];
+            local_result[get_matrix_index(i, j - n, n)] = local_matrix[get_matrix_index(i, j, 2 * n)];
         }
     }
 
@@ -255,19 +266,20 @@ int main(int argc, char *argv[])
         return 1;
     read_matrix(&mat, &n, my_rank);
 
-    // broadcast initial matrix data
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Bcast(&n, 1, MPI_INT, ROOT_PROCESS, MPI_COMM_WORLD);
-    MPI_Bcast(mat, n * 2 * n, MPI_DOUBLE, ROOT_PROCESS, MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
+    // // broadcast initial matrix data
+    // MPI_Barrier(MPI_COMM_WORLD);
+    // MPI_Bcast(&n, 1, MPI_INT, ROOT_PROCESS, MPI_COMM_WORLD);
+    // MPI_Bcast(mat, n * 2 * n, MPI_DOUBLE, ROOT_PROCESS, MPI_COMM_WORLD);
+    // MPI_Barrier(MPI_COMM_WORLD);
 
     start = MPI_Wtime();
     invert_matrix(&mat, n, my_rank, comm_sz, &inverse);
     finish = MPI_Wtime();
-    
+
     print_result(inverse, n, n, my_rank);
 
-    if (my_rank == 0){
+    if (my_rank == 0)
+    {
         printf("Execution Time: %lf\n", finish - start);
     }
 
