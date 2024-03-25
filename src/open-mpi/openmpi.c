@@ -105,7 +105,7 @@ void read_matrix(double **matrix, int *n, int rank)
     }
 }
 
-int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **inverse)
+int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **inverse, double *start)
 {
     // calculate row start and ends for local processing
     int block_size = n / (comm_sz);
@@ -140,7 +140,9 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Scatterv(*mat, sendcounts, send_offset, MPI_DOUBLE, local_matrix, (local_end_row - local_start_row) * 2 * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    // local pivot to be sent
+    // Start time after scatter
+    *start = MPI_Wtime();
+
     pivot_row = (double *)malloc(2 * n * sizeof(double));
 
     /**
@@ -266,14 +268,7 @@ int main(int argc, char *argv[])
         return 1;
     read_matrix(&mat, &n, my_rank);
 
-    // // broadcast initial matrix data
-    // MPI_Barrier(MPI_COMM_WORLD);
-    // MPI_Bcast(&n, 1, MPI_INT, ROOT_PROCESS, MPI_COMM_WORLD);
-    // MPI_Bcast(mat, n * 2 * n, MPI_DOUBLE, ROOT_PROCESS, MPI_COMM_WORLD);
-    // MPI_Barrier(MPI_COMM_WORLD);
-
-    start = MPI_Wtime();
-    invert_matrix(&mat, n, my_rank, comm_sz, &inverse);
+    invert_matrix(&mat, n, my_rank, comm_sz, &inverse, &start);
     finish = MPI_Wtime();
 
     print_result(inverse, n, n, my_rank);
