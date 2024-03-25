@@ -137,8 +137,8 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
 
     // scatterv for mat
     double *local_matrix = (double *)malloc((local_end_row - local_start_row) * 2 * n * sizeof(double));
-    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Scatterv(*mat, sendcounts, send_offset, MPI_DOUBLE, local_matrix, (local_end_row - local_start_row) * 2 * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     // Start time after scatter
     *start = MPI_Wtime();
@@ -164,7 +164,6 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
         }
 
         // send/receive broadcast of pivot row
-        MPI_Barrier(MPI_COMM_WORLD);
         MPI_Bcast(pivot_row, 2 * n, MPI_DOUBLE, bcast_sender_rank, MPI_COMM_WORLD);
 
         /**
@@ -238,7 +237,6 @@ int invert_matrix(double **mat, int n, int my_rank, int comm_sz, double **invers
             return 1;
         }
     }
-    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Gatherv(local_result, (local_end_row - local_start_row) * n, MPI_DOUBLE,
                 *inverse, recvcounts, offsets, MPI_DOUBLE,
                 0, MPI_COMM_WORLD);
