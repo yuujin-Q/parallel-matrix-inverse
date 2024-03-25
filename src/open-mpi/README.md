@@ -17,14 +17,19 @@ Pada perhitungan inverse menggunakan metode Gauss-Jordan, tiap baris akan menjad
 * ``MPI_Bcast`` digunakan juga proses untuk broadcast baris saat baris tersebut menjadi pivot row. Hal ini dikarenakan setiap proses membutuhkan akses terhadap pivot row sedangkan nilai suatu pivot row yang paling terbaru hanya dimiliki oleh satu proses.
 * ``MPI_Gather`` digunakan untuk menyatukan hasil matriks. Hal ini dikarenakan baris-baris matriks yang terbagi di beberapa proses perlu dijadikan satu proses di proses 0 untuk keperluan output.
 
+## Cara Menjalankan
 
-## How to Run
-
-Contoh build, run, dan menyimpan output untuk test case `32.txt`.
-
-```console
-user@user:~/kit-tucil-sister-2024$ make
-user@user:~/kit-tucil-sister-2024$ cat ./test_cases/32.txt | ./bin/serial > 32.txt
+Untuk melakukan build dari kode serial dan paralel tuliskan command berikut pada root folder
+```
+$ make
+```
+Untuk melakukan run dan menyimpan output kode serial untuk test case `32.txt`
+```
+$ cat ./test_cases/32.txt | ./bin/serial > serial32.txt
+```
+Untuk melakukan run dan menyimpan output kode paralel untuk test case `32.txt`
+```
+$ mpirun -n [jumlah proses] ./bin/mpi < 32.txt > paralel32.txt
 ```
 
 ## Perbandingan Waktu
