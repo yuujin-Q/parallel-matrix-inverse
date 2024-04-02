@@ -1,9 +1,12 @@
 OUTPUT_FOLDER = bin
 
-all: serial parallel
+all: serial parallel-mpi parallel-mp
 
-parallel:
+parallel-mpi:
 	mpicc src/open-mpi/openmpi.c -g -Wall -o $(OUTPUT_FOLDER)/mpi
+
+parallel-mp:
+	gcc src/open-mp/openmp.c --openmp -o $(OUTPUT_FOLDER)/mp
 
 serial:
 	g++ src/serial/serial.cpp -o $(OUTPUT_FOLDER)/serial
