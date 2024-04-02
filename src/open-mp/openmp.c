@@ -5,11 +5,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-int get_matrix_index(int row, int col, int width)
-{
-    return width * row + col;
-}
-
 double** allocate_matrix(int n, bool isAugmented) {
     double** mat = (double**) malloc(n * sizeof(double*));
 
@@ -65,7 +60,7 @@ void print_result(double **mat, int n)
     printf("%d\n", n);
     for (int i = 0; i < n; i++)
     {
-        for (int j = n; j < 2*n; j++)
+        for (int j = 0; j < 2*n; j++)
         {
             printf("%lf ", mat[i][j]);
         }
@@ -94,9 +89,8 @@ int main(int argc, char* argv[]) {
         # pragma omp parallel for num_threads(thread_count)
         for (int j = 0; j < n; j++)
         {
-            if (j != i) {          
+            if (j != i) {   
                 double d = mat[j][i] / pivot_row[i];
-                
                 if (d == 0) {
                     continue;
                 }
@@ -104,18 +98,22 @@ int main(int argc, char* argv[]) {
                     double elim = d * pivot_row[k]; 
                     
                     #pragma omp critical
-                    mat[j][k] -= elim;
+                    {
+                        mat[j][k] -= elim;
+                    }
                 }
             }
         }
+        print_result(mat, n);
     }
     free(pivot_row);
 
     # pragma omp parallel for num_threads(thread_count)
     for (int i=0; i<n; i++) {
+        double diagonal = mat[i][i];
         for(int j = 0; j < 2*n; ++j)
         {
-            double newValue = mat[i][j] / mat[i][i];
+            double newValue = mat[i][j] / diagonal;
             
             #pragma omp critical
             mat[i][j] = newValue;
