@@ -60,7 +60,7 @@ void print_result(double **mat, int n)
     printf("%d\n", n);
     for (int i = 0; i < n; i++)
     {
-        for (int j = 0; j < 2*n; j++)
+        for (int j = n; j < 2*n; j++)
         {
             printf("%lf ", mat[i][j]);
         }
@@ -104,7 +104,6 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
-        print_result(mat, n);
     }
     free(pivot_row);
 
