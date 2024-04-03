@@ -35,6 +35,47 @@ double **allocate_matrix(int n, bool isAugmented)
     return mat;
 }
 
+double *get_partial_pivot(double **matrix, int n, int pivot_row, int local_row)
+{
+    double *result = (double *)malloc(2 * n * sizeof(double));
+    if (result == NULL)
+    {
+        printf("Memory allocation failed!");
+        return NULL;
+    }
+
+    double d = matrix[local_row][pivot_row] / matrix[pivot_row][pivot_row];
+    if (d == 0)
+    {
+        for (int k = 0; k < 2 * n; k++)
+        {
+            result[k] = matrix[local_row][k];
+        }
+        return result;
+    }
+    for (int k = 0; k < 2 * n; k++)
+    {
+        double elim = d * matrix[pivot_row][k];
+        result[k] = matrix[local_row][k] - elim;
+    }
+    return result;
+}
+
+double *get_reduced_row(double **matrix, int n, int local_row, double diagonal)
+{
+    double *result = (double *)malloc(2 * n * sizeof(double));
+    if (result == NULL)
+    {
+        printf("Memory allocation failed!");
+        return NULL;
+    }
+    for (int k = 0; k < 2 * n; k++)
+    {
+        result[k] = matrix[local_row][k] / diagonal;
+    }
+    return result;
+}
+
 void read_matrix(double **matrix, int n)
 {
     /**
@@ -102,21 +143,18 @@ int main(int argc, char *argv[])
         #pragma omp parallel for num_threads(thread_count)
         for (int j = 0; j < n; j++)
         {
-            if (j != i)
+            if (i != j)
             {
-                double d = mat[j][i] / mat[i][i];
-                if (d == 0)
+                double *new_row = get_partial_pivot(mat, n, i, j);
+                
+                #pragma omp critical
                 {
-                    continue;
-                }
-                for (int k = 0; k < 2 * n; k++) {
-                    double elim = d * mat[i][k]; 
-                    
-                    #pragma omp critical
+                    for (int k = 0; k < 2 * n; k++)
                     {
-                        mat[j][k] -= elim;
+                        mat[j][k] = new_row[k];
                     }
                 }
+                free(new_row);
             }
         }
     }
@@ -125,12 +163,14 @@ int main(int argc, char *argv[])
     for (int i = 0; i < n; i++)
     {
         double diagonal = mat[i][i];
-        for (int j = 0; j < 2 * n; ++j)
+        double *new_row = get_reduced_row(mat, n, i, diagonal);
+        
+        #pragma omp critical
         {
-            double newValue = mat[i][j] / diagonal;
-
-            #pragma omp critical
-            mat[i][j] = newValue;
+            for (int k = 0; k < 2 * n; k++)
+            {
+                mat[i][k] = new_row[k];
+            }
         }
     }
     double end_time = omp_get_wtime();
