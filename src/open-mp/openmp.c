@@ -96,24 +96,21 @@ int main(int argc, char *argv[])
     read_matrix(mat, n);
 
     double start_time = omp_get_wtime();
-    double *pivot_row;
-    pivot_row = (double *)malloc(2 * n * sizeof(double));
 
     for (int i = 0; i < n; i++)
     {
-        pivot_row = mat[i];
         #pragma omp parallel for num_threads(thread_count)
         for (int j = 0; j < n; j++)
         {
             if (j != i)
             {
-                double d = mat[j][i] / pivot_row[i];
+                double d = mat[j][i] / mat[i][i];
                 if (d == 0)
                 {
                     continue;
                 }
                 for (int k = 0; k < 2 * n; k++) {
-                    double elim = d * pivot_row[k]; 
+                    double elim = d * mat[i][k]; 
                     
                     #pragma omp critical
                     {
@@ -123,7 +120,6 @@ int main(int argc, char *argv[])
             }
         }
     }
-    free(pivot_row);
 
     #pragma omp parallel for num_threads(thread_count)
     for (int i = 0; i < n; i++)
