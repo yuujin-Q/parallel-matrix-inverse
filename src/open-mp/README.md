@@ -30,5 +30,15 @@ Untuk melakukan run dan menyimpan output kode paralel untuk test case `32.txt`
 $ ./bin/mp `<thread_count>` < 32.txt > paralel32.txt
 ```
 
+
 ## Perbandingan Waktu
-<!-- TODO: speedup time  -->
+Compiled in: Win11 - WSL2 Ubuntu 22.04 - AMD Ryzen 5 5600U
+| Matrix n-size | Serial   | OpenMP - 4 Threads | OpenMPI - 8 Threads |
+|---------------|----------|--------------------|---------------------|
+| 32            | 0.011s   |        0.005s      |        0.020s       |
+| 64            | 0.014s   |        0.0014s     |        0.022s       |
+| 128           | 0.047s   |        0.0026s     |        0.043s       |
+| 256           | 0.246s   |        0.079s      |        0.078s       |
+| 512           | 1.636s   |        0.384s      |        0.330s       |
+| 1024          | 12.089s  |        2.952s      |        2.013s       |
+| 2048          | 106.112s |        23.58s      |        19.076s      |
