@@ -1,5 +1,3 @@
-// gcc mp.c --openmp -o mp
-
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,42 +95,29 @@ int main(int argc, char *argv[])
 
     double start_time = omp_get_wtime();
 
-    for (int i = 0; i < n; i++)
+    #pragma omp parallel num_threads(thread_count)
     {
-        #pragma omp parallel for num_threads(thread_count)
-        for (int j = 0; j < n; j++)
-        {
-            if (j != i)
-            {
-                double d = mat[j][i] / mat[i][i];
-                if (d == 0)
-                {
-                    continue;
-                }
-                for (int k = 0; k < 2 * n; k++) {
-                    double elim = d * mat[i][k]; 
-                    
-                    #pragma omp critical
-                    {
-                        mat[j][k] -= elim;
+        for (int i = 0; i < n; i++) {
+            #pragma omp for schedule(static)
+            for (int j = 0; j < n; j++) {
+                if (j != i) {
+                    double d = mat[j][i] / mat[i][i];
+                    for (int k = 0; k < 2 * n; k++) {
+                        mat[j][k] -= d * mat[i][k];
                     }
                 }
             }
         }
-    }
 
-    #pragma omp parallel for num_threads(thread_count)
-    for (int i = 0; i < n; i++)
-    {
-        double diagonal = mat[i][i];
-        for (int j = 0; j < 2 * n; ++j)
-        {
-            double newValue = mat[i][j] / diagonal;
-
-            #pragma omp critical
-            mat[i][j] = newValue;
+        #pragma omp for schedule(static)
+        for (int i = 0; i < n; i++) {
+            double diagonal = mat[i][i];
+            for (int j = 0; j < 2 * n; j++) {
+                mat[i][j] /= diagonal;
+            }
         }
     }
+
     double end_time = omp_get_wtime();
 
     print_result(mat, n);
