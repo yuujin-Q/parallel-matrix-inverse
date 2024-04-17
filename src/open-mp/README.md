@@ -15,6 +15,11 @@ Berikut adalah *directive pragma* OMP yang digunakan dalam implementasi solusi.
 * ``parallel num_threads(thread_count)``: `parallel` menginstruksikan compiler untuk melakukan paralelisasi pada sebuah blok kode yang dituju. Argumen `num_threads` digunakan untuk memspesifikasi jumlah thread yang digunakan pada blok kode tersebut.
 * ``for schedule(static)``: `for` menginstruksikan compiler untuk membagi iterasi yang dilakukan dalam sebuah blok loop for secara rata kepada jumlah thread yang digunakan. Argumen `schedule(static)` menginstruksikan compiler untuk melakukan alokasi pembagian iterasi secara statik (round-robin).
 
+## Alasan Pemilihan Skema Pembagian Data
+- Efisiensi Memori dan Akses Data: Karena semua thread berbagi akses ke memori yang sama (shared memory), penggunaan memori menjadi efisien. 
+- Pengurangan Overhead: Dengan membagi matriks ke dalam baris-baris yang dihandle oleh berbagai thread, komunikasi antar-thread dapat diminimalkan. Setiap thread melakukan operasi secara independen pada bagian matriks yang ditugaskan, yang mengurangi kebutuhan untuk sinkronisasi.
+- Penjadwalan Static: Pemilihan penjadwalan static dalam OpenMP di sini dimaksudkan untuk memberikan kepastian tentang bagian kerja yang ditangani oleh setiap thread. Ini mengurangi latensi yang berasal dari pembagian kerja runtime dan menjadikan eksekusi lebih cepat.
+
 ## Cara Menjalankan
 
 Untuk melakukan build dari kode serial dan paralel tuliskan command berikut pada root folder
